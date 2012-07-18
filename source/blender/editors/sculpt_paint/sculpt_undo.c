@@ -65,6 +65,7 @@
 #include "GPU_buffers.h"
 
 #include "ED_sculpt.h"
+#include "bmesh.h"
 #include "paint_intern.h"
 #include "sculpt_intern.h"
 
@@ -261,8 +262,29 @@ static int sculpt_undo_restore_mask(bContext *C, DerivedMesh *dm, SculptUndoNode
 	return 1;
 }
 
+static void sculpt_undo_bmesh_restore(Object *ob, SculptSession *ss,
+									  PaintRestoreDirection direction)
+{
+	DerivedMesh *dm = ob->derivedFinal;
+
+	if (direction == PAINT_RESTORE_UNDO)
+		BM_log_undo(ss->bm, ss->bm_log);
+	else
+		BM_log_redo(ss->bm, ss->bm_log);
+
+	/* A bit lame, but for now just recreate the PBVH. The alternative
+	 * is to store changes to the PBVH in the undo stack. */
+	if (ss->pbvh)
+		BLI_pbvh_free(ss->pbvh);
+	if (dm)
+		dm->getPBVH(NULL, dm);
+	ss->pbvh = NULL;
+
+	ss->pbvh = dm->getPBVH(ob, dm);
+}
+
 static void sculpt_undo_restore(bContext *C, ListBase *lb,
-								PaintRestoreDirection UNUSED(direction))
+								PaintRestoreDirection direction)
 {
 	Scene *scene = CTX_data_scene(C);
 	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
@@ -290,6 +312,12 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb,
 	/* call _after_ sculpt_update_mesh_elements() which may update 'ob->derivedFinal' */
 	dm = mesh_get_derived_final(scene, ob, 0);
 
+	if (ss->bm) {
+		/* TODO */
+		sculpt_undo_bmesh_restore(ob, ss, direction);
+		return;
+	}
+
 	for (unode = lb->first; unode; unode = unode->next) {
 		if (!(strcmp(unode->idname, ob->id.name) == 0))
 			continue;
@@ -306,9 +334,6 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb,
 			{
 				continue;
 			}
-		}
-		else {
-			continue;
 		}
 
 		switch (unode->type) {
@@ -443,6 +468,8 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node,
 	BLI_pbvh_node_num_verts(ss->pbvh, node, &totvert, &allvert);
 	BLI_pbvh_node_get_grids(ss->pbvh, node, &grids, &totgrid,
 	                        &maxgrid, &gridsize, NULL, NULL);
+	/* TODO */
+	unode->bm_group = (void*)0x1;
 
 	unode->totvert = totvert;
 	
@@ -543,6 +570,36 @@ static void sculpt_undo_store_mask(Object *ob, SculptUndoNode *unode)
 	BLI_pbvh_vertex_iter_end;
 }
 
+static SculptUndoNode *sculpt_undo_push_bmesh(Object *ob, PBVHNode *node)
+{
+	ListBase *lb = undo_paint_push_get_list(UNDO_PAINT_MESH);
+	SculptUndoNode *unode = lb->first;
+	SculptSession *ss = ob->sculpt;
+	PBVHVertexIter vd;
+
+	if (!lb->first) {
+		unode = MEM_callocN(sizeof(*unode), AT);
+
+		BLI_strncpy(unode->idname, ob->id.name, sizeof(unode->idname));
+		unode->type = SCULPT_UNDO_COORDS;
+
+		/* Maybe not needed... (TODO) */
+		//BLI_pbvh_bmesh_entry_finalize(ss->pbvh);
+		;//unode->bm_group = bm_log_group_current(ss->bm->log);
+
+		BLI_addtail(lb, unode);
+	}
+
+	BLI_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_ALL)
+	{
+		BM_log_vert_moved(ss->bm_log, vd.bm_vert);
+		//bm_log_coord_set(ss->bm, vd.bm_vert);
+	}
+	BLI_pbvh_vertex_iter_end;
+
+	return unode;
+}
+
 SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node,
                                       SculptUndoType type)
 {
@@ -552,7 +609,14 @@ SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node,
 	/* list is manipulated by multiple threads, so we lock */
 	BLI_lock_thread(LOCK_CUSTOM1);
 
-	if ((unode = sculpt_undo_get_node(node))) {
+	if (ss->bm) {
+		/* Dynamic topology stores only one undo node per stroke,
+		   regardless of the number of PBVH nodes modified */
+		unode = sculpt_undo_push_bmesh(ob, node);
+		BLI_unlock_thread(LOCK_CUSTOM1);
+		return unode;
+	}
+	else if ((unode = sculpt_undo_get_node(node))) {
 		BLI_unlock_thread(LOCK_CUSTOM1);
 		return unode;
 	}
