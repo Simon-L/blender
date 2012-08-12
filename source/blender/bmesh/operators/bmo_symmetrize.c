@@ -352,18 +352,23 @@ static BMFace *symm_face_create_v(BMesh *bm, BMVert **fv, BMEdge **fe, int len)
 	BMFace *f_new;
 	int i;
 
-	for (i = 0; i < len; i++) {
-		int j = (i + 1) % len;
-		fe[i] = BM_edge_exists(fv[i], fv[j]);
-		if (!fe[i]) {
-			fe[i] = BM_edge_create(bm, fv[i], fv[j], NULL, FALSE);
-			BMO_elem_flag_enable(bm, fe[i], SYMM_OUTPUT_GEOM);
+	BLI_assert(len >= 3);
+	if (len >= 3) {
+
+		for (i = 0; i < len; i++) {
+			int j = (i + 1) % len;
+			fe[i] = BM_edge_exists(fv[i], fv[j]);
+			if (!fe[i]) {
+				fe[i] = BM_edge_create(bm, fv[i], fv[j], NULL, FALSE);
+				BMO_elem_flag_enable(bm, fe[i], SYMM_OUTPUT_GEOM);
+			}
 		}
+		f_new = BM_face_create(bm, fv, fe, len, TRUE);
+		BM_face_select_set(bm, f_new, TRUE);
+		BMO_elem_flag_enable(bm, f_new, SYMM_OUTPUT_GEOM);
+		return f_new;
 	}
-	f_new = BM_face_create(bm, fv, fe, len, TRUE);
-	BM_face_select_set(bm, f_new, TRUE);
-	BMO_elem_flag_enable(bm, f_new, SYMM_OUTPUT_GEOM);
-	return f_new;
+	return NULL;
 }
 
 static void symm_mesh_output_poly_zero_splits(Symm *symm,
