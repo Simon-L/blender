@@ -30,7 +30,7 @@
 
 #include <assert.h>
 
-typedef struct BMLogEntry {
+struct BMLogEntry {
 	struct BMLogEntry *next, *prev;
 
 	/* The following GHashes map from an element ID to one of the log
@@ -50,7 +50,7 @@ typedef struct BMLogEntry {
 
 	BLI_mempool *pool_verts;
 	BLI_mempool *pool_faces;
-} BMLogEntry;
+};
 
 struct BMLog {
 	/* Tree of free IDs */
@@ -470,6 +470,9 @@ void BM_log_free(BMLog *log)
 	if (log->id_to_elem)
 		BLI_ghash_free(log->id_to_elem, NULL, NULL);
 
+	if (log->elem_to_id)
+		BLI_ghash_free(log->elem_to_id, NULL, NULL);
+
 	for (entry = log->entries.first; entry; entry = entry->next)
 		bm_log_entry_free(entry);
 
@@ -488,7 +491,7 @@ void BM_log_free(BMLog *log)
  *
  * In either case, the new entry is set as the current log entry.
  */
-void BM_log_entry_add(BMLog *log)
+BMLogEntry *BM_log_entry_add(BMLog *log)
 {
 	BMLogEntry *entry, *next;
 
@@ -506,7 +509,8 @@ void BM_log_entry_add(BMLog *log)
 	entry = bm_log_entry_create();
 	BLI_addtail(&log->entries, entry);
 	log->current_entry = entry;
-	
+
+	return entry;
 }
 
 void BM_log_undo(BMesh *bm, BMLog *log)

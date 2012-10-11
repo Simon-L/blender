@@ -468,8 +468,6 @@ static SculptUndoNode *sculpt_undo_alloc_node(Object *ob, PBVHNode *node,
 	BLI_pbvh_node_num_verts(ss->pbvh, node, &totvert, &allvert);
 	BLI_pbvh_node_get_grids(ss->pbvh, node, &grids, &totgrid,
 	                        &maxgrid, &gridsize, NULL, NULL);
-	/* TODO */
-	unode->bm_group = (void*)0x1;
 
 	unode->totvert = totvert;
 	
@@ -583,17 +581,15 @@ static SculptUndoNode *sculpt_undo_push_bmesh(Object *ob, PBVHNode *node)
 		BLI_strncpy(unode->idname, ob->id.name, sizeof(unode->idname));
 		unode->type = SCULPT_UNDO_COORDS;
 
-		/* Maybe not needed... (TODO) */
-		//BLI_pbvh_bmesh_entry_finalize(ss->pbvh);
-		;//unode->bm_group = bm_log_group_current(ss->bm->log);
+		unode->bm_entry = BM_log_entry_add(ss->bm_log);
 
 		BLI_addtail(lb, unode);
 	}
 
-	BLI_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_ALL)
-	{
+	/* Before any coordinates get modified, ensure their original
+	 * positions are logged */
+	BLI_pbvh_vertex_iter_begin(ss->pbvh, node, vd, PBVH_ITER_ALL) {
 		BM_log_vert_moved(ss->bm_log, vd.bm_vert);
-		//bm_log_coord_set(ss->bm, vd.bm_vert);
 	}
 	BLI_pbvh_vertex_iter_end;
 
@@ -611,7 +607,7 @@ SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node,
 
 	if (ss->bm) {
 		/* Dynamic topology stores only one undo node per stroke,
-		   regardless of the number of PBVH nodes modified */
+		 * regardless of the number of PBVH nodes modified */
 		unode = sculpt_undo_push_bmesh(ob, node);
 		BLI_unlock_thread(LOCK_CUSTOM1);
 		return unode;
@@ -685,3 +681,58 @@ void sculpt_undo_push_end(void)
 
 	undo_paint_push_end(UNDO_PAINT_MESH);
 }
+
+/************************** Dynamic Topology **************************/
+
+typedef struct SculptUndoDyntopo {
+	struct SculptUndoDyntopo *prev, *next;
+
+	SculptUndoDyntopoType type;
+} SculptUndoDyntopo;
+
+static void sculpt_undo_dyntopo_restore(bContext *C, ListBase *lb,
+										PaintRestoreDirection UNUSED(direction))
+{
+	
+	SculptUndoDyntopo *udt = lb->first;
+
+	switch (udt->type) {
+		case SCULPT_UNDO_DYNTOPO_DISABLE:
+			/* Re-enable dynamic topology */
+			sculpt_dynamic_topology_enable(C);
+			break;
+
+		case SCULPT_UNDO_DYNTOPO_ENABLE:
+			/* Disable dynamic topology */
+			sculpt_dynamic_topology_disable(C);
+			break;
+	}
+
+	/* Swap operation */
+	udt->type = (udt->type == SCULPT_UNDO_DYNTOPO_ENABLE ?
+				 SCULPT_UNDO_DYNTOPO_DISABLE :
+				 SCULPT_UNDO_DYNTOPO_ENABLE);
+}
+
+static void sculpt_undo_dyntopo_free(ListBase *UNUSED(lb))
+{
+}
+
+void sculpt_undo_push_dynamic_topology(Object *UNUSED(ob),
+									   SculptUndoDyntopoType type)
+{
+	ListBase *lb;
+	SculptUndoDyntopo *undo_elem;
+
+	undo_paint_push_begin(UNDO_PAINT_MESH, "Toggle Dynamic Topology",
+	                      sculpt_undo_dyntopo_restore, sculpt_undo_dyntopo_free);
+
+	lb = undo_paint_push_get_list(UNDO_PAINT_MESH);
+
+	undo_elem = MEM_callocN(sizeof(*undo_elem), AT);
+	undo_elem->type = type;
+	BLI_addtail(lb, undo_elem);
+
+	undo_paint_push_end(UNDO_PAINT_MESH);
+}
+

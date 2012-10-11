@@ -26,6 +26,7 @@ struct BMVert;
 struct BMesh;
 
 typedef struct BMLog BMLog;
+typedef struct BMLogEntry BMLogEntry;
 
 /* Allocate and initialize a new BMLog */
 BMLog *BM_log_create(BMesh *bm);
@@ -34,7 +35,7 @@ BMLog *BM_log_create(BMesh *bm);
 void BM_log_free(BMLog *log);
 
 /* Start a new log entry and update the log entry list */
-void BM_log_entry_add(BMLog *log);
+BMLogEntry *BM_log_entry_add(BMLog *log);
 
 void BM_log_undo(BMesh *bm, BMLog *log);
 void BM_log_redo(BMesh *bm, BMLog *log);

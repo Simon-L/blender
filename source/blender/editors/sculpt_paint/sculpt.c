@@ -4149,12 +4149,6 @@ static int sculpt_stroke_test_start(bContext *C, struct wmOperator *op,
 		sculpt_update_cache_invariants(C, sd, ss, op, mouse);
 
 		sculpt_undo_push_begin(sculpt_tool_name(sd));
-		if (ss->bm) {
-			/* TODO */
-			BM_log_entry_add(ss->bm_log);
-			//bm_log_group_create(ss->bm->log, sculpt_tool_name(sd));
-		}
-
 		return 1;
 	}
 	else
@@ -4416,51 +4410,91 @@ static void SCULPT_OT_set_persistent_base(wmOperatorType *ot)
 
 /************************** Dynamic Topology **************************/
 
-static int sculpt_dynamic_topology_toggle_exec(bContext *C, wmOperator *UNUSED(op))
+static void sculpt_pbvh_clear(Object *ob)
 {
-	Scene *scene = CTX_data_scene(C);
-	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
-	SculptSession *ss = CTX_data_active_object(C)->sculpt;
-	Object *ob = CTX_data_active_object(C);
-	Mesh *me = ob->data;
+	SculptSession *ss = ob->sculpt;
 
 	/* Clear out any existing DM and PBVH */
 	if (ss->pbvh)
 		BLI_pbvh_free(ss->pbvh);
 	BKE_object_free_display(ob);
 	ss->pbvh = NULL;
+}
+
+static void sculpt_update_after_dynamic_topology_toggle(bContext *C)
+{
+	Scene *scene = CTX_data_scene(C);
+	Object *ob = CTX_data_active_object(C);
+	Sculpt *sd = scene->toolsettings->sculpt;
+
+	/* Create the PBVH */
+	sculpt_update_mesh_elements(scene, sd, ob, FALSE, FALSE);
+	/* TODO: probably shouldn't be modifier? */
+	WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
+}
+
+void sculpt_dynamic_topology_enable(bContext *C)
+{
+	Object *ob = CTX_data_active_object(C);
+	SculptSession *ss = ob->sculpt;
+	Mesh *me = ob->data;
+
+	sculpt_pbvh_clear(ob);
+
+	/* Create triangles-only BMesh */
+	ss->bm = BM_mesh_create(&bm_mesh_allocsize_default);
+	BM_mesh_bm_from_me(ss->bm, me, TRUE, ob->shapenr);
+	BMO_op_callf(ss->bm, BMO_FLAG_DEFAULTS, "triangulate faces=%af");
+	CustomData_add_layer(&ss->bm->vdata, CD_PAINT_MASK, CD_CALLOC,
+						 NULL, ss->bm->totvert);
+	BM_mesh_normals_update(ss->bm, TRUE);
+
+	/* Enable dynamic topology */
+	me->flag |= ME_SCULPT_DYNAMIC_TOPOLOGY;
+	
+	/* Enable logging for undo/redo */
+	BLI_assert(!ss->bm_log);
+	ss->bm_log = BM_log_create(ss->bm);
+
+	/* Refresh */
+	sculpt_update_after_dynamic_topology_toggle(C);
+}
+
+void sculpt_dynamic_topology_disable(bContext *C)
+{
+	Object *ob = CTX_data_active_object(C);
+	SculptSession *ss = ob->sculpt;
+	Mesh *me = ob->data;
+
+	sculpt_pbvh_clear(ob);
+
+	/* Write out the BMesh to the Mesh */
+	BM_mesh_bm_to_me(ss->bm, me, FALSE);
+	BM_mesh_free(ss->bm);
+
+	/* Clear data */
+	me->flag &= ~ME_SCULPT_DYNAMIC_TOPOLOGY;
+	ss->bm = NULL;
+	BM_log_free(ss->bm_log);
+	ss->bm_log = NULL;
+
+	/* Refresh */
+	sculpt_update_after_dynamic_topology_toggle(C);
+}
+
+static int sculpt_dynamic_topology_toggle_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Object *ob = CTX_data_active_object(C);
+	SculptSession *ss = ob->sculpt;
 
 	if (ss->bm) {
-		/* Disable dynamic topology */
-		/* TODO */
-		me->flag &= ~ME_SCULPT_DYNAMIC_TOPOLOGY;
-		BM_mesh_bm_to_me(ss->bm, me, FALSE);
-		BM_mesh_free(ss->bm);
-		ss->bm = NULL;
+		sculpt_undo_push_dynamic_topology(ob, SCULPT_UNDO_DYNTOPO_DISABLE);
+		sculpt_dynamic_topology_disable(C);
 	}
 	else {
-		/* Enable dynamic topology */
-		me->flag |= ME_SCULPT_DYNAMIC_TOPOLOGY;
-		ss->bm = BM_mesh_create(&bm_mesh_allocsize_default);
-		BM_mesh_bm_from_me(ss->bm, me, TRUE, ob->shapenr);
-
-		/* TODO, but stuff to make sure bm is OK */
-		/* Triangulate */
-		BMO_op_callf(ss->bm, BMO_FLAG_DEFAULTS, "triangulate faces=%af");
-		CustomData_add_layer(&ss->bm->vdata, CD_PAINT_MASK, CD_CALLOC,
-							 NULL, ss->bm->totvert);
-		BM_mesh_normals_update(ss->bm, TRUE);
-
-		//BM_mesh_enable_logging(ss->bm);
-
-		/* Enable logging for undo/redo */
-		if (!ss->bm_log)
-			ss->bm_log = BM_log_create(ss->bm);
-		/* Important TODO! when can we free the log? */
+		sculpt_undo_push_dynamic_topology(ob, SCULPT_UNDO_DYNTOPO_ENABLE);
+		sculpt_dynamic_topology_enable(C);
 	}
-
-	sculpt_update_mesh_elements(scene, sd, ob, FALSE, FALSE);
-	WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
 
 	return OPERATOR_FINISHED;
 }

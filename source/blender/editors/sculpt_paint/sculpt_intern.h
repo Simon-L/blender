@@ -67,6 +67,10 @@ void free_sculptsession_deformMats(struct SculptSession *ss);
 /* Stroke */
 int sculpt_stroke_get_location(bContext *C, float out[3], const float mouse[2]);
 
+/* Dynamic topology */
+void sculpt_dynamic_topology_enable(struct bContext *C);
+void sculpt_dynamic_topology_disable(struct bContext *C);
+
 /* Undo */
 
 typedef enum {
@@ -102,7 +106,7 @@ typedef struct SculptUndoNode {
 	BLI_bitmap *grid_hidden;
 
 	/* bmesh */
-	struct BMLogGroup *bm_group;
+	struct BMLogEntry *bm_entry;
 
 	/* layer brush */
 	float *layer_disp;
@@ -111,6 +115,13 @@ typedef struct SculptUndoNode {
 	char shapeName[sizeof(((KeyBlock *)0))->name];
 } SculptUndoNode;
 
+typedef enum {
+	SCULPT_UNDO_DYNTOPO_DISABLE,
+	SCULPT_UNDO_DYNTOPO_ENABLE
+} SculptUndoDyntopoType;
+
+void sculpt_undo_push_dynamic_topology(Object *ob,
+									   SculptUndoDyntopoType type);
 SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node, SculptUndoType type);
 SculptUndoNode *sculpt_undo_get_node(PBVHNode *node);
 void sculpt_undo_push_begin(const char *name);
