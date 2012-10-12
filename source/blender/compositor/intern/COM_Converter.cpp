@@ -119,6 +119,7 @@
 #include "COM_ViewLevelsNode.h"
 #include "COM_ViewerNode.h"
 #include "COM_ZCombineNode.h"
+#include "COM_SkeletonNode.h"
 
 Node *Converter::convert(bNode *b_node, bool fast)
 {
@@ -389,6 +390,9 @@ Node *Converter::convert(bNode *b_node, bool fast)
 		case CMP_NODE_TRACKPOS:
 			node = new TrackPositionNode(b_node);
 			break;
+		case CMP_NODE_SKELETON:
+		    node = new SkeletonNode(b_node);
+		    break;
 		/* not inplemented yet */
 		default:
 			node = new MuteNode(b_node);

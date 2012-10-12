@@ -702,6 +702,12 @@ typedef struct NodeTrackPosData {
 	char track_name[64];
 } NodeTrackPosData;
 
+typedef struct NodeSkeletonData {
+    float skeleton_float; /* Remember to pad according to data size. See 
+                      http://wiki.blender.org/index.php/Dev:2.5/Source/Architecture/DefineProperty#DNA
+                      for more information */
+} NodeSkeletonData;
+
 /* frame node flags */
 #define NODE_FRAME_SHRINK		1	/* keep the bounding box minimal */
 #define NODE_FRAME_RESIZEABLE	2	/* test flag, if frame can be resized by user */

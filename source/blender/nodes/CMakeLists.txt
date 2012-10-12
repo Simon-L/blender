@@ -120,6 +120,8 @@ set(SRC
 	composite/nodes/node_composite_switch.c
 	composite/nodes/node_composite_colorcorrection.c
 	
+	composite/nodes/node_composite_skeleton.c
+	
 	composite/node_composite_tree.c
 	composite/node_composite_util.c
 

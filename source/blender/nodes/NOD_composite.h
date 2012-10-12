@@ -136,4 +136,5 @@ void register_node_type_cmp_switch(struct bNodeTreeType *ttype);
 
 void register_node_type_cmp_trackpos(struct bNodeTreeType *ttype);
 
+void register_node_type_cmp_skeleton(struct bNodeTreeType *ttype);
 #endif

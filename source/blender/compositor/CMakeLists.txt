@@ -323,6 +323,11 @@ set(SRC
 	operations/COM_GammaCorrectOperation.h
 	operations/COM_GammaCorrectOperation.cpp
 
+    nodes/COM_SkeletonNode.cpp
+    nodes/COM_SkeletonNode.h
+    operations/COM_SkeletonOperation.cpp
+    operations/COM_SkeletonOperation.h
+    
 	# Matte nodes
 	nodes/COM_BoxMaskNode.cpp
 	nodes/COM_BoxMaskNode.h
