@@ -2424,6 +2424,11 @@ static void node_composit_buts_bokehblur(uiLayout *layout, bContext *UNUSED(C), 
 	uiItemR(layout, ptr, "blur_max", 0, NULL, ICON_NONE);
 }
 
+static void node_composit_skeleton(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+    uiItemR(layout, ptr, "skeleton_float_rna", 0, NULL, ICON_NONE);
+}
+
 static void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
 {
 //	node_composit_backdrop_canvas(snode, backdrop, node, x, y);
@@ -2862,6 +2867,9 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 		case CMP_NODE_TRACKPOS:
 			ntype->uifunc = node_composit_buts_trackpos;
 			break;
+		case CMP_NODE_SKELETON:
+		    ntype->uifunc = node_composit_skeleton;
+		    break;
 		default:
 			ntype->uifunc = NULL;
 	}

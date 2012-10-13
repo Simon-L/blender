@@ -564,6 +564,11 @@ typedef struct NodeTonemap {
 	int type;
 } NodeTonemap;
 
+
+typedef struct NodeSkeleton {
+    float skeleton_float, pad;
+} NodeSkeleton;
+
 /* qdn: lens distortion node */
 typedef struct NodeLensDist {
 	short jit, proj, fit, pad;
@@ -702,11 +707,6 @@ typedef struct NodeTrackPosData {
 	char track_name[64];
 } NodeTrackPosData;
 
-typedef struct NodeSkeletonData {
-    float skeleton_float; /* Remember to pad according to data size. See 
-                      http://wiki.blender.org/index.php/Dev:2.5/Source/Architecture/DefineProperty#DNA
-                      for more information */
-} NodeSkeletonData;
 
 /* frame node flags */
 #define NODE_FRAME_SHRINK		1	/* keep the bounding box minimal */

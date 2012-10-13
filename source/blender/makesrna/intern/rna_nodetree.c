@@ -3869,14 +3869,14 @@ static void def_cmp_trackpos(StructRNA *srna)
 
 static void def_cmp_skeleton(StructRNA *srna)
 {
-/*   PropertyRNA *prop;
+    PropertyRNA *prop;
+    RNA_def_struct_sdna_from(srna, "NodeSkeleton", "storage");
     
-	prop = RNA_def_property(srna, "skeleton_float", PROP_FLOAT, PROP_FACTOR);
-	RNA_def_property_float_sdna(prop, NULL, "skeleton_float");
+	prop = RNA_def_property(srna, "skeleton_float", PROP_FLOAT, PROP_NONE);
+    RNA_def_property_float_sdna(prop, NULL, "skeleton_float");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Skeleton Float", "Skeleton float data");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
-*/
 }
 
 /* -- Texture Nodes --------------------------------------------------------- */
